@@ -1,0 +1,7 @@
+[default]
+description = """
+Deja que la interfaz escriba en el diario del sistema con el identificador de la
+aplicación. No puede elegir ese identificador ni ningún otro campo de confianza:
+sólo el nivel y el texto.
+"""
+permissions = ["allow-registrar", "allow-identificador"]

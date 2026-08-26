@@ -1,0 +1,20 @@
+[package]
+name = "tauri-plugin-vsk-journal"
+version = "2.0.0"
+authors = ["Joaquin (Pato) Decima <jdecima@vasak.net.ar>", "Vasak Group"]
+description = "Journal logging for Tauri applications, with their own identifier (Created for VasakOS)"
+edition = "2021"
+rust-version = "1.80.0"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+links = "tauri-plugin-vsk-journal"
+repository = "https://github.com/Vasak-OS/tauri-plugin-vsk-journal/"
+license-file = "LICENSE"
+readme = "README.md"
+
+[dependencies]
+tauri = "2"
+serde = "1.0"
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
