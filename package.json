@@ -1,6 +1,6 @@
 {
   "name": "@vasakgroup/plugin-vsk-journal",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "author": "Joaquin (Pato) Decima <joaquin.decima@vasak.net.ar>",
   "description": "Journal logging for Tauri applications, with their own identifier (Created for VasakOS)",
   "type": "module",
