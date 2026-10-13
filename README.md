@@ -1,106 +1,417 @@
-# tauri-plugin-vsk-journal
+# Tauri plugin vsk journal
 
-Registro en el diario del sistema para las aplicaciones de VasakOS, **con el nombre
-de cada aplicación**.
 
-## El problema
 
-Una aplicación gráfica que se abre desde el menú es hija del compositor. Lo que
-manda por `stderr` termina en el diario atribuido a la unidad de la sesión, no a
-ella. Dos consecuencias, las dos medidas en una máquina real:
+---
 
-1. El selector de aplicaciones de `vasak-monitor` lista el terminal, los ajustes y
-   la galería, y para todas dice «sin entradas». No porque no escriban: porque lo
-   que escriben no lleva su nombre y no hay forma de filtrarlo.
-2. El 25/08/2026 `vasak-desktop` abortó. Lo único que quedó fue un volcado de
-   núcleo sin símbolos: veinte marcos con `n/a`. El mensaje del panic **sí** se
-   había escrito, a un `stderr` que después no se podía leer. El crash quedó sin
-   diagnosticar.
+## Tecnología
 
-## Qué hace
+Uso: generate-readme-badges.sh <tipo>
 
-Habla el protocolo nativo de `systemd-journald`: un datagrama a
-`/run/systemd/journal/socket` con pares `CAMPO=valor`. Sin privilegios, sin
-`libsystemd`, sin dependencias nuevas. Si no hay socket —un contenedor, una máquina
-sin systemd— se cae a `stderr` y no molesta a nadie.
+Tipos válidos:
+  tauri-vue       Apps Tauri + Vue 3 (Rust, Tauri, Vue 3, TypeScript)
+  rust-service    Servicios Rust systemd/D-Bus (Rust, systemd, D-Bus)
+  cpp-plugin      Plugins C++ Wayfire (C++, Meson, Wayfire)
+  meson-c         Módulos C WirePlumber (C, Meson, WirePlumber)
+  meson-cpp       Plugins C++ genéricos Meson (C++, Meson)
 
-- Cada entrada lleva `SYSLOG_IDENTIFIER` con el nombre de la aplicación, así que
-  `journalctl -t vasak-terminal` y el selector del monitor la encuentran.
-- `VSK_CAPA` dice si el mensaje salió de la interfaz o del núcleo, que se arreglan
-  en archivos distintos.
-- El gancho de pánico deja el mensaje, el archivo y la línea con prioridad de
-  crítico. El caso de arriba, con esto puesto, se diagnostica leyendo el diario.
+Ejemplos:
+  ./generate-readme-badges.sh tauri-vue
+  ./generate-readme-badges.sh rust-service > tech-badges.md
 
-## Uso
+## Estado
 
-### Rust
+[![CI](https://github.com/Vasak-OS/tauri-plugin-vsk-journal/actions/workflows/ci.yml/badge.svg)](https://github.com/Vasak-OS/tauri-plugin-vsk-journal/actions/workflows/ci.yml)
+[![Versión](https://img.shields.io/github/v/release/Vasak-OS/tauri-plugin-vsk-journal?style=flat&label=Versi%C3%B3n)](https://github.com/Vasak-OS/tauri-plugin-vsk-journal/releases)
+[![Licencia](https://img.shields.io/github/license/Vasak-OS/tauri-plugin-vsk-journal?style=flat)](LICENSE)
+[![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=Vasak-OS_tauri-plugin-vsk-journal&metric=coverage&style=flat)](https://sonarcloud.io/summary/new_code?id=Vasak-OS_tauri-plugin-vsk-journal)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Vasak-OS_tauri-plugin-vsk-journal&metric=alert_status&style=flat)](https://sonarcloud.io/summary/new_code?id=Vasak-OS_tauri-plugin-vsk-journal)
+[![Tamaño repo](https://img.shields.io/github/repo-size/Vasak-OS/tauri-plugin-vsk-journal?style=flat)](https://github.com/Vasak-OS/tauri-plugin-vsk-journal)
 
-```rust
-tauri::Builder::default()
-    .plugin(tauri_plugin_vsk_journal::init())
+---
+
+## Descripción
+
+
+
+**Para el usuario:** 
+
+**Integración VasakOS:** Integra con el ecosistema VasakOS vía D-Bus y configuración compartida.
+
+---
+
+## Arquitectura (diagramas)
+
+> Copia y pega la plantilla que necesites, descomenta y adapta.
+
+### Flujo de datos
+
+```mermaid
+<!--
+graph TD
+    A[Entrada: Teclado / Ratón / D-Bus / Sistema] --> B[Procesamiento: Core Rust + Tauri Commands]
+    B --> C[Salida: UI actualizada / Acciones del sistema]
+    style A fill:#e1f5fe
+    style C fill:#e8f5e9
+-->
 ```
 
-Firma con el nombre del ejecutable, que es el que coincide con lo que el diario ya
-guarda en `_COMM`. Para elegir otro, `init_con_identificador("vasak-terminal")`.
+### Componentes internos
 
-```rust
-use tauri_plugin_vsk_journal::DiarioExt;
-
-app.diario().error("no se pudo abrir la configuración");
-app.diario().informacion("arrancó con el tema oscuro");
+```mermaid
+<!--
+flowchart LR
+    subgraph App[Tauri plugin vsk journal]
+        UI[Frontend Vue 3 + vue-libvasak]
+        Core[Core Rust: lógica principal]
+        IPC[Tauri Commands / Eventos]
+        System[Systemd / D-Bus / PipeWire / Wayland]
+    end
+    UI --> IPC
+    IPC --> Core
+    Core --> DBus[(D-Bus / zbus)]
+    Core --> System
+    style UI fill:#f3e5f5
+    style Core fill:#e3f2fd
+    style DBus fill:#fff3e0
+    style System fill:#fce4ec
+-->
 ```
 
-### Interfaz
+### Integración en el sistema VasakOS
 
-```ts
-import { captureFailures, error, getIdentifier } from '@vasakgroup/plugin-vsk-journal';
-
-// Lo que rompe la interfaz deja de ser invisible.
-const soltar = captureFailures();
-
-await error('el usuario no tiene permisos para esa carpeta');
+```mermaid
+<!--
+C4Context
+    title Tauri plugin vsk journal en VasakOS
+    Person(usuario, "Usuario", "Persona que usa el sistema")
+    System_Boundary(c1, "VasakOS") {
+        System(app, "Tauri plugin vsk journal", "")
+        System_Ext(settings, "vasak-settings", "Configuración central")
+        System_Ext(keyring, "vasak-keyring", "Secrets y claves")
+        System_Ext(accounts, "vasak-accounts", "Cuentas e identidad")
+        System_Ext(permissions, "vasak-permissions", "Permisos y portales")
+    }
+    System_Ext(systemd, "systemd", "Gestión de servicios")
+    System_Ext(dbus, "D-Bus", "Bus de mensajes del sistema")
+    System_Ext(wayland, "Wayland / Wayfire", "Compositor")
+    System_Ext(pipewire, "PipeWire", "Multimedia")
+    Rel(usuario, app, "Usa")
+    Rel(app, settings, "Lee/escribe config")
+    Rel(app, keyring, "Guarda/lee secrets")
+    Rel(app, accounts, "Identidad de cuenta")
+    Rel(app, permissions, "Solicita permisos")
+    Rel(app, systemd, "Activación / sockets")
+    Rel(app, dbus, "Expone / consume interfaces")
+    Rel(app, wayland, "Superficies / protocolos")
+    Rel(app, pipewire, "Streams de audio/video")
+-->
 ```
 
-`captureFailures()` engancha `error` y `unhandledrejection`, y replica lo que va a
-`console.error` y `console.warn`. Devuelve la función que lo deshace. La consola
-sigue mostrando lo suyo: esto agrega el diario, no reemplaza nada.
+---
 
-## Seguridad
+## Instalación
 
-Lo único que este plugin no puede permitir es que un mensaje escriba entradas
-falsas. La forma corta del protocolo es `CAMPO=valor\n`, así que un valor con un
-salto de línea adentro podría inventar campos: un mensaje con `\nPRIORITY=0\n`
-convertiría un aviso de la interfaz en una emergencia del sistema, y con
-`\nSYSLOG_IDENTIFIER=sshd\n` se escribirían entradas a nombre de otro servicio.
-
-Cualquier valor con un salto de línea va en la forma larga —nombre, salto, ocho
-bytes de largo en little endian, los datos crudos, salto— donde el largo manda y el
-contenido no se interpreta. Comprobado contra el diario de verdad: el intento queda
-como texto dentro del mensaje, con la prioridad y el identificador que se pidieron.
-
-Además:
-
-- Los campos que empiezan con `_` —`_PID`, `_UID`, `_COMM`— los pone `journald` y
-  son los que hacen confiable una entrada. Se rechazan.
-- La interfaz elige el nivel y el texto. **El identificador no**: lo pone el lado
-  Rust al arrancar. Si se pudiera elegir desde el WebView, una página cargada ahí
-  escribiría a nombre de cualquier servicio del sistema.
-- El nivel se acota en lugar de rechazarse, y los mensajes se recortan avisando:
-  perder la línea sería lo contrario de para qué existe esto.
-
-## Pruebas
+### Arch Linux (repo oficial)
 
 ```bash
-cargo test          # 20 unitarias
-bun test            # 15 de la interfaz
-cargo test -- --ignored   # contra el journald de la máquina
+pacman -S vasak-tauri-plugin-vsk-journal
 ```
 
-Las dos últimas necesitan un diario de verdad, así que están marcadas `ignore`: en
-CI no hay socket y no habría nada que comprobar. Se corren a mano cuando se toca el
-protocolo, que es donde un error no lo ve ningún test unitario — los campos pueden
-estar perfectos y el diario rechazar el datagrama entero.
+### Debian / Ubuntu (.deb)
+
+```bash
+wget https://github.com/Vasak-OS/tauri-plugin-vsk-journal/releases/download/v{{VERSION}}/vasak-tauri-plugin-vsk-journal_{{VERSION}}_amd64.deb
+sudo apt install ./vasak-tauri-plugin-vsk-journal_{{VERSION}}_amd64.deb
+```
+
+### Desde fuente
+
+```bash
+git clone https://github.com/Vasak-OS/tauri-plugin-vsk-journal.git
+cd tauri-plugin-vsk-journal
+
+# Build Rust (plugin Tauri)
+cargo build --release --locked
+
+# Tests
+cargo test --locked
+
+# Publicar (crates.io + npm)
+cargo publish --locked
+npm publish
+```
+
+### Flatpak / AppImage
+
+> *Placeholder: añadir cuando exista paquete Flatpak o AppImage oficial.*
+
+## Uso desde npm
+
+Publicado como `@vasakgroup/tauri-plugin-vsk-journal` en npm.
+
+### Instalación
+
+```bash
+# Con bun (recomendado)
+bun add @vasakgroup/tauri-plugin-vsk-journal
+
+# Con npm
+npm install @vasakgroup/tauri-plugin-vsk-journal
+
+# Con pnpm
+pnpm add @vasakgroup/tauri-plugin-vsk-journal
+```
+
+### Uso básico
+
+```typescript
+import { tauri_plugin_vsk_journal } from '@vasakgroup/tauri-plugin-vsk-journal';
+
+// Inicializar el plugin en tu app Tauri
+const plugin = tauri_plugin_vsk_journal();
+
+// Usar las APIs expuestas
+// Ver documentación completa en: https://docs.vasakos.org/plugins/vsk-journal
+```
+
+### Documentación completa
+
+- **Referencia API:** [docs.vasakos.org/plugins/vsk-journal](https://docs.vasakos.org/plugins/vsk-journal)
+- **Changelog:** [GitHub Releases](https://github.com/Vasak-OS/tauri-plugin-vsk-journal/releases)
+- **Ejemplos:** [vasak-apps](https://github.com/Vasak-OS/vasak-apps/tree/main/examples/vsk-journal)
+
+---
+
+## Uso rápido
+
+```bash
+# Se lanza automáticamente (systemd --user) o manualmente:
+tauri-plugin-vsk-journal
+```
+
+### Atajos / flags principales
+
+| Acción | Comando / Tecla |
+|--------|-----------------|
+| Acción principal | `tauri-plugin-vsk-journal` |
+| Configuración | `tauri-plugin-vsk-journal --config` |
+| Ayuda | `tauri-plugin-vsk-journal --help` |
+
+> **Captura:** `assets/demo.gif` *(placeholder — sustituir por GIF real)*
+
+---
+
+## Configuración
+
+### Archivo de configuración
+
+```
+~/.config/vasak/tauri-plugin-vsk-journal.toml
+```
+
+### Variables de entorno
+
+| Variable | Descripción | Por defecto |
+|----------|-------------|-------------|
+| `VASAK_DEBUG` | Activa logs de depuración en consola | `false` |
+| `VASAK_PROFILE` | Perfil de rendimiento: `balanced`, `performance`, `power-save` | `balanced` |
+
+### Integración con `tauri-plugin-config-manager`
+
+- Esquemas de color: respeta `--ui-primary`, `--ui-surface`, `--ui-focus`, `--ui-on-surface`, `--ui-border`
+- Tema de iconos: usa el tema del sistema (`vasakos-icon-theme`) vía `vicon` lookup
+- Radio de bordes: variable CSS `--ui-radius` del esquema activo (por defecto 12px)
+- Fuentes: `--ui-font-family`, `--ui-font-size-base` desde el esquema
+
+---
+
+## Desarrollo
+
+### Requisitos
+
+- **Rust:** `rustup` toolchain estable (`rust-toolchain.toml` fija la versión)
+- **Node / bun:** `bun` ≥ 1.1 (nunca npm/yarn/pnpm para apps Tauri)
+- **Sistema:** `pkg-config`, `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`, `libssl-dev`
+- *`libssl-dev` para TLS, dependencias específicas del plugin*
+
+### Dependencias de desarrollo
+
+#### Sistema (paquetes Arch / Debian / Fedora)
+
+`base-devel`, `pkgconf`, `libssl-dev`, `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev`, `librsvg2-dev`, `gstreamer1.0-plugins-base`, `gstreamer1.0-plugins-good`, `libpipewire-0.3-dev`, `libwireplumber-0.5-dev`, `libdbus-1-dev`, `libudev-dev`, `libxkbcommon-dev`, `libwayland-dev`, `meson`, `ninja`, `clang`, `lld`
+
+#### Rust
+
+`rustup` → `stable` + `rustfmt` + `clippy`
+
+#### Node
+
+**Solo `bun`** (nunca npm/yarn/pnpm para apps Tauri). `bun --version` ≥ 1.1
+
+#### Herramientas CLI
+
+`just` (command runner), `cargo-binstall` (opcional), `cargo-llvm-cov` (para cobertura)
+
+### Correr la app en desarrollo
+
+```bash
+# Frontend (Vite dev server + Tauri dev)
+bun run tauri dev
+
+# Solo frontend (Vite)
+bun run dev
+
+# Solo backend (cargo watch)
+cargo watch -x "run --bin tauri-plugin-vsk-journal"
+```
+
+### Compilar / Build de release
+
+```bash
+# Build completo (frontend + backend + bundle)
+bun run tauri build
+
+# Solo frontend (para testear bundle después)
+bun run build
+
+# Solo backend Rust (binario optimizado)
+cargo build --release --locked
+
+# Paquetes nativos
+# Arch: makepkg -sf en PKGBUILDS/tauri-plugin-vsk-journal/
+# Debian: cargo deb --no-build --target-dir src-tauri/target/release/debian
+```
+
+### Targets principales
+
+```bash
+# Desarrollo (Tauri dev server + hot reload)
+bun run dev
+
+# Build producción
+bun run build
+
+# Solo frontend
+bun run build:frontend
+
+# Solo backend Rust
+cargo build --release --locked
+
+# Lint + tipos (pre-commit / CI)
+bunx --bun biome check .
+bunx vue-tsc --noEmit
+cargo fmt --check
+```
+
+### Pruebas
+
+```bash
+# Tests Rust
+cargo test -p tauri-plugin-vsk-journal --locked
+
+# Tests JS (si tiene bindings)
+bun test
+```
+
+### Convención de commits
+
+[Conventional Commits](https://www.conventionalcommits.org/es/v1.0.0/):
+
+```
+<tipo>(<ámbito>): <descripción corta>
+
+[cuerpo opcional]
+
+[pie opcional: Closes #N]
+```
+
+Tipos habituales: `feat`, `fix`, `bugfix`, `docs`, `ci`, `chore`, `security`, `refactor`, `perf`, `test`.
+
+### Cómo abrir PR
+
+1. Rama desde `origin/main`:
+   ```bash
+   git worktree add -b feat/tema ~/wt/tauri-plugin-vsk-journal-tema origin/main
+   ```
+2. Prefijos de rama: `fix/`, `feat/`, `bugfix/`, `docs/`, `ci/`, `chore/`, `security/`
+3. Escribe el fix → **`qa` escribe las pruebas** (fallan sin el fix) → suite verde → abre PR
+4. Al abrir PR, **cuatro cosas obligatorias**:
+   - Asignado a `JoaquinDecima`
+   - Etiqueta `enhancement` o `bug` (+ `ci` / `dependencies` si aplica)
+   - Añadido al proyecto «VasakOS Roadmap»
+   - Status **In Progress**
+
+---
+
+## Arquitectura (texto)
+
+### Crates / módulos principales
+
+| `tauri-plugin-vsk-journal` | Plugin Tauri: Rust backend + JS bindings |
+
+### Interfaces D-Bus / zbus expuestas
+
+| `org.vasak.vsk-journal` | Métodos específicos del plugin | Funcionalidad expuesta a apps Tauri |
+
+### Puntos de extensión
+
+- **Plugins:** Sistema de plugins modular
+- **Hooks:** Hooks de ciclo de vida
+- **API pública Rust:** API pública del crate principal
+
+### Features / Cargo features
+
+| Feature | Descripción | Default |
+|---------|-------------|---------|
+| `async` | API asíncrona (futures) | ✓ |
+| `blocking` | API bloqueante para compatibilidad | |
+
+Y para apps Tauri+Vue: features del `tauri.conf.json` → `bundle` / `plugins` / `allowlist` (capabilities).
+
+---
+
+## Pruebas y calidad
+
+- **Cobertura objetivo:** ≥ 80 % del código nuevo (SonarCloud Quality Gate)
+- **Informes:** GitHub Actions → pestaña *SonarCloud Code Analysis* → enlace a SonarCloud
+- **Añadir pruebas:** ver `AGENTS.md` sección 9 (mapa de repos y comandos de prueba)
+- **Regla:** toda corrección lleva prueba escrita por `qa` que falla sin el fix
+
+---
+
+## Contribuir
+
+- **Guía:** [.github/CONTRIBUTING.md](https://github.com/Vasak-OS/.github/blob/main/CONTRIBUTING.md)
+- **Plantillas de issue:** [.github/ISSUE_TEMPLATE/](https://github.com/Vasak-OS/.github/tree/main/ISSUE_TEMPLATE)
+- **Código de conducta:** [CODE_OF_CONDUCT.md](https://github.com/Vasak-OS/.github/blob/main/CODE_OF_CONDUCT.md)
+
+---
+
+## Contribuidores
+
+> **Actualizado automáticamente en CI** — muestra los avatares de quienes han aportado código a este repo.
+
+<div align="center">
+  <a href="https://github.com/JoaquinDecima" target="_blank"><img src="https://avatars.githubusercontent.com/u/11674229?v=4&s=40" width="40" height="40" alt="JoaquinDecima" style="border-radius: 50%; margin: 2px;" title="JoaquinDecima (15 contribuciones)"></a>
+</div>
+
+[Ver todos los contribuidores](https://github.com/Vasak-OS/tauri-plugin-vsk-journal/graphs/contributors)
+
+---
+
+## Donadores / Sponsors
+
+[![Sponsors](https://img.shields.io/github/sponsors/Vasak-OS?style=flat&label=Sponsors)](https://github.com/sponsors/Vasak-OS)
+
+> **Backers:** *Actualizado automáticamente en CI desde GitHub Sponsors / OpenCollective / Polar.*
+
+[💖 Donar al proyecto](https://github.com/sponsors/Vasak-OS)
+
+---
 
 ## Licencia
 
-GPLv3.
+`GPL-3.0` — Copyright © 2026 **Vasak-OS Contributors**
+
+[Ver licencia completa](LICENSE)
